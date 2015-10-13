@@ -51,5 +51,9 @@ yelp.eachUserData <- function(func, loggingLine = 10000){
   yelp.eachData('user', func, loggingLine)
 }
 
+yelp.eachTipData <- function(func, loggingLine = 10000){
+  yelp.eachData('tip', func, loggingLine)
+}
+
 yelp.TrueCharacter <- c('TRUE', '1', 'true', 'yes', 'ok')
 yelp.FalseCharacter <- c('FALSE', '0', 'false', 'no', 'none')
