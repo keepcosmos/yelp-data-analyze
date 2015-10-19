@@ -1,5 +1,7 @@
 # Load for yelp data set
 
+# https://cran.r-project.org/web/packages/doParallel/vignettes/gettingstartedParallel.pdf
+
 library(RJSONIO)
 library(plyr)
 library(data.table)
@@ -16,6 +18,12 @@ yelp.getReadLength <- function(){
   }else{
     -1L
   }
+}
+
+yelp.saveReasult <- function(fileName, func){
+  data <- func()
+  write.table(data, file = paste('data/rda/', fileName, sep = ''))
+  message(fileName, ' is saved!')
 }
 
 yelp.loadFile <- function(sourceType){
