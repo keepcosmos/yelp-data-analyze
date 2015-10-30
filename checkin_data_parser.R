@@ -10,6 +10,14 @@ yelp.loadCheckInData <- function(){
                                      t(unlist(data$checkin_info))),
                           fill = TRUE)
   }, 3000)
+
+  cols <- colnames(checkInData)
+  colsLength <- length(cols)
+  cols <- sapply(cols[2:colsLength], yelp.splitColName)
+  setnames(checkInData, c('business_id', cols))
+  colOrdered <- c(1, (order(cols) + 1))
+  setcolorder(checkInData, colOrdered)
+  checkInData[is.na(checkInData)] <- 0
   checkInData
 }
 
@@ -24,4 +32,9 @@ yelp.getDefaultCheckInColumns <- function(){
     }
   }
   checkInColumns
+}
+
+yelp.splitColName <- function(name){
+  colS <- strsplit(name, split = '-')[[1]]
+  paste(colS[2], '-', sprintf('%02d', as.integer(colS[1])), sep = '')
 }

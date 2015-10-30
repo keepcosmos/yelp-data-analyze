@@ -77,7 +77,8 @@ yelp.loadBusinessAttribute <- function(){
     if(length(data$attributes) > 0){
       tryCatch({
         businessAttribute <<- rbind(businessAttribute,
-                                    data.table(t(unlist(data$attributes))),
+                                    data.table(business_id = as.character(data$business_id),
+                                               t(unlist(data$attributes))),
                                     fill = TRUE
                                     ) 
       }, error = function(e){

@@ -10,10 +10,12 @@ yelp.loadTipData <- function(){
 
   yelp.eachTipData(function(data, i){
     tipData <<- rbind(tipData, data.table(user_id = data$user_id,
-                                          business_id = data$business_id,
-                                          text = data$text,
+                                          business_id = as.character(data$business_id),
+                                          text = as.character(data$text),
                                           likes = data$likes,
-                                          date = data$date))
+                                          date = data$date), 
+                      fill = TRUE
+                      )
   })
   tipData$likes <- as.integer(tipData$likes)
   tipData$date <- as.Date(tipData$date)
