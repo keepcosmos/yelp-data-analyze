@@ -1,7 +1,39 @@
+#'AdaBoost.M1
 library('data.table')
 library('dplyr')
 library('caret')
-source('data_loader.R')
+library('randomForest')
+
+yelp.attrAndStarByCategory <- function(category){
+  catAttr <- yelp.bizAttrByCategory(category)
+  catBase <- yelp.bizBaseByCategory(category)
+  catStar <- select(catBase, business_id, review_count, stars)
+  cat <- merge(catAttr, catStar, by = 'business_id')
+  cat$stars <- as.factor(cat$stars)
+  cat
+}
+
+yelp.treatNA <- function(bizData){
+  bizData[is.na(bizData)] <- FALSE
+  na.roughfix(bizData)
+  # bizData[is.na(bizData)] <- 'no'
+  # bizData[is.na(bizData)] <- 'none'
+  # bizData[is.na(bizData)] <- 'average'
+  # bizData[is.na(bizData)] <- 'casual'
+  # bizData[is.na(bizData)] <- 'allages'
+  bizData
+}
+
+yelp.removeNZV <- function(bizData){
+  select(bizData, -nearZeroVar(bizData))
+}
+
+yelp.removeLessObservedColumn <- function(bizData){
+  cutoff <- as.integer(length(bizData$business_id) * 2 / 3)
+  liveCols <- colSums(is.na(bizData)) < cutoff
+  liveColNames <- colnames(bizData)[liveCols]
+  select(bizData, one_of(liveColNames))
+}
 
 yelp.checkinByCategory <- function(category){
   checkin <- yelp.readCheckin()
@@ -13,9 +45,9 @@ yelp.bizAttrByCategory <- function(category){
   bizAttr[bizAttr$business_id %in% yelp.getBizIdsByCategory(category)]
 }
 
-yelp.getBizBaseByCategory <- function(category){
+yelp.bizBaseByCategory <- function(category){
   bizBase <- yelp.readBizBase()
-  bizBase[bizBase$business_id %in% yelp.getBizBaseByCategory(category)]
+  bizBase[bizBase$business_id %in% yelp.getBizIdsByCategory(category)]
 }
 
 yelp.getBizIdsByCategory <- function(categ){

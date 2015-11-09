@@ -1,0 +1,148 @@
+---
+title: "Data Science Capstone - Final Report"
+author: "Jaehyun Shin"
+date: "09 Nov 2015"
+output:
+  html_document: 
+    highlight: tango
+  pdf_document:
+    latex_engine: xelatex
+---
+
+### 비지니스 카테고리별 속성에 따른 사용자 별점 예측
+
+## Abstract
+이 리포트는 각 비지니스 카테고리별로 제공되는 부가 서비스(비지니스 속성) 항목을 에따라 해당 비지니스를 이용한 사용자의 평점을 분석하여, 그 연관관계를 찾아내고 속성에 따른 별점 예츨 모델을 제안한다.
+
+## Introduction
+비지니스에서는 다양한 부가적 서비스를 제공한다. Wi-Fi, Parking area, Happy hour등이 있다. 또한 비지니스에는 제한사항이 있는데, Appolintment.Only, Smoking, Dos Allowed가 그렇다.
+
+각 비지니스의 종류별로(카페, 바, 뷰티 & 스파) 사용자들에게 필요한 부가서비스나 고려사항들이 다를 것이며, 그 제공되는 속성들에 따라서 사용자가 느끼는 서비스 퀄리티도 다를것이다.
+
+이 리포트는 각 비지니스 종류별로 사용자들에게 보편적으로 고려되는 속성을 찾아내고 어떤 부가적인 서비스가 평점에 영향을 미치는지 과정을 기술한다. 또한 비지니스 종류별 / 속성에 따라 평점을 예측할 수 있는 모델을 제안한다.
+
+* 아래 기술된 R 소스는 https://github.com/keepcosmos/yelp-data-analyze 에서 확인할 수 있다.
+
+## Getting and formatting the data
+
+### Getting the data
+활용데이터는 [Yelp Datset challenge](http://www.yelp.com/dataset_challenge)를 통해 얻을 수 있다. 해당 데이터는 json format이며 비지니스 정보, 리뷰 정보, 사용자정보, 체크인정보, 팁 정보로 구성되어 있다. 
+
+### Formatting the data
+1. json 포멧으로 되어있는 text파일을 불러오고, 특정 조건에 따라 파싱할 수 있는 메서드 정의
+
+```{r}
+library(RJSONIO)
+
+# '/data' 폴더 및에 있는 데이터.json파일을 읽어온다.
+yelp.loadFile <- function(sourceType){
+  filePath <- paste("data/yelp_academic_dataset_", sourceType, ".json", sep='')
+  readLines(filePath, -1L)
+}
+
+# 각 string 라인을 JSON타입으로 변경하고, 변경된 내용을 callback으로 넘겨준다.
+# 즉 JSON으로 파싱된 각 라인별로 특정한 함수를 실행하게 해준다.
+yelp.eachData <- function(sourceType, func){
+  lines <- yelp.loadFile(sourceType)
+  lineLength <- length(lines)
+  for(i in 1:lineLength){ func(fromJSON(lines[i]), i) }
+}
+
+yelp.eachBusinessData <- function(func){
+  yelp.eachData('business', func)
+}
+# source에 따라 yelp.eachTipData, yelp.eachReviewData등을 정의한다.
+```
+
+2. 각 비지니스 기본 정보 불러오기
+```{r}
+library('data.table')
+yelp.loadBusinessBase <- function(){
+  columns <- c('business_id', 'full_address', 'city', 'review_count', 'name', 'longitude', 'state', 'stars', 'latitude', 'type')
+  factorColumns <- c('city', 'state', 'type')
+  baseData <- vector(mode = 'list')
+  yelp.eachBusinessData(function(data, i){
+    baseData[[i]] <<- data[columns]
+  })
+  baseData <- ldply(baseData, data.frame, stringsAsFactors = F)
+  
+  for(column in factorColumns){
+    baseData[[column]] <- as.factor(baseData[[column]])
+  }
+  data.table(baseData)
+}
+```
+
+3. 각 비지니스의 카테고리 정보를 불러온다.
+```{r, warning=F, message=F, cache=T}
+yelp.loadBusinessCategory <- function(){
+  businessCategory <- data.table(business_id = character(),
+                                 category = character())
+  yelp.eachBusinessData(function(data, i){
+    for(category in data$categories){
+      businessCategory <<- rbind(businessCategory,
+                                data.table(business_id = data$business_id, category = category))
+    }
+  })
+  businessCategory$category <- as.factor(businessCategory$category)
+  businessCategory
+}
+```
+
+4. 각 비지니스의 속성 정보를 불러온다.
+```{r}
+yelp.loadBusinessAttribute <- function(){
+  columns <- yelp.getAttributeColumKeys()
+  businessAttribute <- data.table()
+  for(column in columns) businessAttribute[[column]] <- character()
+  yelp.eachBusinessData(function(data, i){
+    if(length(data$attributes) > 0){
+      tryCatch({
+        businessAttribute <<- rbind(businessAttribute,
+                                    data.table(business_id = as.character(data$business_id),
+                                               t(unlist(data$attributes))),
+                                    fill = TRUE
+                                    ) 
+      }, error = function(e){
+        warning(i, " line parsing error : ", e)
+      })
+    }
+  })
+  yelp.castAttributeData(businessAttribute)
+}
+```
+* 더 자세한 해당 소스는 https://github.com/keepcosmos/yelp-data-analyze에서 확인 할 수 있다.
+* 해당 방식으로 만든 data.frame은 Rda파일로 저장한 후 활용하였다.
+
+### Exploratory the data
+```{r, warning=F, message=F, echo=F}
+source('data_loader.R')
+```
+#### 비지니스 카테고리
+```{r cache=T}
+bizCat <- yelp.readBizCategory()
+summary(bizCat$category)[1:10]
+```
+* 각 카테고리별로 비지니스의 수를 알 수 있다.
+* 총 `r length(unique(bizCat$category))` 개의 카테고리가 존재한다.
+
+#### 비지니스 속성
+```{r}
+bizAttr <- yelp.readBizAttr()
+attrs <- colnames(select(bizAttr, -business_id))
+attrs[1:10]
+```
+* 총 `r length(attrs)`개의 속성이 존재한다.
+
+#### 별점
+```{r}
+bizBase <- yelp.readBizBase()
+head(select(bizBase, business_id, name, stars), 5)
+```
+* 각 비지니스별로 별점을 분류해서 볼 수 있다.
+
+### Cleaning and Preprocessing data
+각 비지니스는 여러개의 카테고리를 가질 수 있다. 
+
+
+https://rpubs.com/davizuku/capstone
