@@ -12,23 +12,25 @@ output:
 ### 비지니스 카테고리별 속성에 따른 사용자 별점 예측
 
 ## Abstract
-이 리포트는 각 비지니스 카테고리별로 제공되는 부가 서비스(비지니스 속성) 항목을 에따라 해당 비지니스를 이용한 사용자의 평점을 분석하여, 그 연관관계를 찾아내고 속성에 따른 별점 예츨 모델을 제안한다.
+이 리포트는 비지니스가 제공하는 부가서비스 및 속성에 따른 평점의 연관관계를 찾아내고 예측 모델을 만드는 연구이다. 비지니스의 카테고리별로 영향을 미치는 속성이 다르기 때문에, 카테고리별로 분류하여 측정할 것이다.
 
 ## Introduction
-비지니스에서는 다양한 부가적 서비스를 제공한다. Wi-Fi, Parking area, Happy hour등이 있다. 또한 비지니스에는 제한사항이 있는데, Appolintment.Only, Smoking, Dos Allowed가 그렇다.
+각 비지니스의 카테고리 별로 Wi-Fi, Parking area, Happy hour등의 다양한 부가적 서비스를 제공하고. 또한 Appolintment.Only, Smoking, Dos Allowed와 같은 여러 속성들이 있다.
 
 각 비지니스의 종류별로(카페, 바, 뷰티 & 스파) 사용자들에게 필요한 부가서비스나 고려사항들이 다를 것이며, 그 제공되는 속성들에 따라서 사용자가 느끼는 서비스 퀄리티도 다를것이다.
 
-이 리포트는 각 비지니스 종류별로 사용자들에게 보편적으로 고려되는 속성을 찾아내고 어떤 부가적인 서비스가 평점에 영향을 미치는지 과정을 기술한다. 또한 비지니스 종류별 / 속성에 따라 평점을 예측할 수 있는 모델을 제안한다.
+이 리포트는 각 비지니스 종류별로 사용자들에게 보편적으로 고려되는 속성을 찾아내고, 어떤 종류의 속성이 평점에 영향을 미치는지를 찾아내는 과정을 기술한다. 또한 비지니스 종류별 / 속성에 따라 평점을 예측할 수 있는 모델을 제안한다.
 
 * 아래 기술된 R 소스는 https://github.com/keepcosmos/yelp-data-analyze 에서 확인할 수 있다.
 
 ## Getting and formatting the data
 
 ### Getting the data
-활용데이터는 [Yelp Datset challenge](http://www.yelp.com/dataset_challenge)를 통해 얻을 수 있다. 해당 데이터는 json format이며 비지니스 정보, 리뷰 정보, 사용자정보, 체크인정보, 팁 정보로 구성되어 있다. 
+데이터는 [Yelp Datset challenge](http://www.yelp.com/dataset_challenge)를 통해 얻을 수 있다. 해당 데이터는 json format이며 비지니스 정보, 리뷰 정보, 사용자정보, 체크인정보, 팁 정보로 구성되어 있다.
 
-### Formatting the data
+아래에는 yelp에서 다운로드 받은 text파일을 파싱하여 data.frame으로 변환하는 작업을 설명한다.
+
+### Getting and Cleaning Data
 1. json 포멧으로 되어있는 text파일을 불러오고, 특정 조건에 따라 파싱할 수 있는 메서드 정의
 
 ```{r}
@@ -41,7 +43,7 @@ yelp.loadFile <- function(sourceType){
 }
 
 # 각 string 라인을 JSON타입으로 변경하고, 변경된 내용을 callback으로 넘겨준다.
-# 즉 JSON으로 파싱된 각 라인별로 특정한 함수를 실행하게 해준다.
+# 즉, JSON으로 파싱된 각 라인별로 특정 조건에 따라 파싱할 수 있도록 해준다.
 yelp.eachData <- function(sourceType, func){
   lines <- yelp.loadFile(sourceType)
   lineLength <- length(lines)
@@ -54,7 +56,9 @@ yelp.eachBusinessData <- function(func){
 # source에 따라 yelp.eachTipData, yelp.eachReviewData등을 정의한다.
 ```
 
-2. 각 비지니스 기본 정보 불러오기
+2. 위에 정의되어 있는 메서드를 사용하여, 아래와 같은방법으로 파싱하여 원하는 데이터를 data.frame으로 반환할 수 있도록 해주었다.
+
+  + 비지니스의 기본적인 속성을 data.frame 타입으로 변환한다.
 ```{r}
 library('data.table')
 yelp.loadBusinessBase <- function(){
@@ -73,7 +77,7 @@ yelp.loadBusinessBase <- function(){
 }
 ```
 
-3. 각 비지니스의 카테고리 정보를 불러온다.
+  +  각 비지니스의 카테고리 정보를 data.frame 타입으로 변환한다.
 ```{r, warning=F, message=F, cache=T}
 yelp.loadBusinessCategory <- function(){
   businessCategory <- data.table(business_id = character(),
@@ -89,7 +93,7 @@ yelp.loadBusinessCategory <- function(){
 }
 ```
 
-4. 각 비지니스의 속성 정보를 불러온다.
+  + 각 비지니스의 속성 정보를 data.frame 타입으로 변환한다.
 ```{r}
 yelp.loadBusinessAttribute <- function(){
   columns <- yelp.getAttributeColumKeys()
@@ -98,11 +102,7 @@ yelp.loadBusinessAttribute <- function(){
   yelp.eachBusinessData(function(data, i){
     if(length(data$attributes) > 0){
       tryCatch({
-        businessAttribute <<- rbind(businessAttribute,
-                                    data.table(business_id = as.character(data$business_id),
-                                               t(unlist(data$attributes))),
-                                    fill = TRUE
-                                    ) 
+        businessAttribute <<- rbind(businessAttribute, data.table(business_id = as.character(data$business_id), t(unlist(data$attributes))), fill = TRUE) 
       }, error = function(e){
         warning(i, " line parsing error : ", e)
       })
@@ -111,24 +111,33 @@ yelp.loadBusinessAttribute <- function(){
   yelp.castAttributeData(businessAttribute)
 }
 ```
+
 * 더 자세한 해당 소스는 https://github.com/keepcosmos/yelp-data-analyze에서 확인 할 수 있다.
-* 해당 방식으로 만든 data.frame은 Rda파일로 저장한 후 활용하였다.
 
 ### Exploratory the data
-```{r, warning=F, message=F, echo=F}
+
+위의 방식으로 파싱된 데이터들은 `Rda`파일로 변환 / 저장시킨 후 사용할 수 있도록 하였다.
+```{r, warning=F, message=F}
 source('data_loader.R')
-```
-#### 비지니스 카테고리
-```{r cache=T}
+bizBase <- yelp.readBizBase()
 bizCat <- yelp.readBizCategory()
+bizAttr <- yelp.readBizAttr()
+```
+
+#### 비지니스 카테고리
+1. 카테고리는 business_id, category 2개의 컬럼이 존재하고, 하나의 비지니스는 여러개의 카테고리를 가질 수 있다.
+```{r}
+head(bizCat, 5)
+```
+
+2. 각 카테고리 별로 비지니스의 수를 알 수 있다.
+```{r}
 summary(bizCat$category)[1:10]
 ```
-* 각 카테고리별로 비지니스의 수를 알 수 있다.
 * 총 `r length(unique(bizCat$category))` 개의 카테고리가 존재한다.
 
 #### 비지니스 속성
 ```{r}
-bizAttr <- yelp.readBizAttr()
 attrs <- colnames(select(bizAttr, -business_id))
 attrs[1:10]
 ```
@@ -136,17 +145,19 @@ attrs[1:10]
 
 #### 별점
 ```{r}
-bizBase <- yelp.readBizBase()
 head(select(bizBase, business_id, name, stars), 5)
 ```
 * 각 비지니스별로 별점을 분류해서 볼 수 있다.
 
-### Cleaning and Preprocessing data
-각 비지니스는 여러개의 카테고리를 가질 수 있다. 각 카테고리를 통해 비지니스 속성과 별점을 불러온다. 대표적으로 Cafe & Tea 카테고리로 적용해본다.
 
-1. 클리닝 데이터
+각 비지니스는 여러개의 카테고리를 가지고있다. 각 비지니스 카테고리별로 관측된 속성들이 다르다, 예를 들어 `Bars` 카테고리의 경우, Wi-Fi, Noize Level, Happy Hour들은 관측된 비지니스가 많지만, hair type과 같은 속성은 관측되지 않는다. 
+우리는 각 카테고리별로 유효한 속성드를 분류해 낼 수 있을 것이며, 그 속성에 따라 평점의 연관관계를 측정해 볼 수 있을 것이다. 물론 리뷰의 갯수도 고려해야할 대상이다.
+
+### Preprocessing data
+각 카테고리별로 추출해야할 Attribute가 다르기 때문에 이 레포트에서는 대표적으로 `Coffee & Tea` 카테고리를 예로 한다. 
+
+1. 카테고리에 따라 평점 데이터와 속성 데이터 추출하기
 ```{r}
-bizCat <- yelp.readBizCategory()
 bizIds <- bizCat[bizCat$category == 'Coffee & Tea']$business_id
 
 bizBase <- yelp.readBizBase()
@@ -155,12 +166,13 @@ bizBase <- select(bizBase, business_id, review_count, stars)
 
 bizAttr <- yelp.readBizAttr()
 bizAttr <- bizAttr[bizAttr$business_id %in% bizIds]
-
 dataset <- merge(bizBase, bizAttr, by = 'business_id')
 ```
+
 2. 후기의 개수가 적게 누적되어 판단이 떨어지는 상점을 제거한다.
 ```{r}
 dataset <- dataset[dataset$review_count > 5]
+dataset <- select(dataset, -review_count)
 ```
 
 3. 속성이 적게 관측되어 있는 컬럼을 제거한다.
@@ -178,8 +190,34 @@ dataset <- select(dataset, -nearZeroVar(dataset))
 
 이제 `Coffee & Tea` 카테고리에 대해 가장 의미 있는 비지니스 속성은 다음과 같다.
 ```{r}
-
+str(dataset)
 ```
+
+### Modeling
+
+해당 데이터 내용을 통해 Machine learning을 할 수 있는, 예측 알고리즘 모델링을 만든다.
+해당 데이터는 속성에 따른 연관관계를 측정하는 것이므로 classification modeling을 할 것이고, 그 알고리즘 중 하나인 rpart를 사용할 것이다.
+
+모든 데이터들을 factor로 변환할 것이다.
+
+1. 해당 데이터에서 NA 값이 들어있는 처리해준다.
+```{r}
+dataset <- dataset[, lapply(.SD, as.character)]
+dataset[is.na(dataset)] <- 'NOT OBSERVED'
+dataset <- dataset[, lapply(.SD, as.factor)]
+dataset$business_id <- as.character(dataset$business_id)
+```
+  + NA 값은 'NOT OBSERVED'란 별도의 값으로 처리한다.
+
+2. Data Splitting
+```{r}
+set.seed(123)
+trainIndex <- createDataPartition(dataset$stars, p = 0.8, list = F)[, 1]
+trainData <- dataset[trainIndex]
+trainData <- select(trainData, -business_id)
+testData <- dataset[-trainIndex]
+```
+
 
 이제 각 속성에 대해 별점이 어떻게 측정되는지 예측해보자.
 

@@ -14,13 +14,8 @@ yelp.attrAndStarByCategory <- function(category){
 }
 
 yelp.treatNA <- function(bizData){
-  bizData[is.na(bizData)] <- FALSE
+  bizData[is.na(bizData)] <- 0
   na.roughfix(bizData)
-  # bizData[is.na(bizData)] <- 'no'
-  # bizData[is.na(bizData)] <- 'none'
-  # bizData[is.na(bizData)] <- 'average'
-  # bizData[is.na(bizData)] <- 'casual'
-  # bizData[is.na(bizData)] <- 'allages'
   bizData
 }
 
