@@ -142,7 +142,52 @@ head(select(bizBase, business_id, name, stars), 5)
 * 각 비지니스별로 별점을 분류해서 볼 수 있다.
 
 ### Cleaning and Preprocessing data
-각 비지니스는 여러개의 카테고리를 가질 수 있다. 
+각 비지니스는 여러개의 카테고리를 가질 수 있다. 각 카테고리를 통해 비지니스 속성과 별점을 불러온다. 대표적으로 Cafe & Tea 카테고리로 적용해본다.
+
+1. 클리닝 데이터
+```{r}
+bizCat <- yelp.readBizCategory()
+bizIds <- bizCat[bizCat$category == 'Coffee & Tea']$business_id
+
+bizBase <- yelp.readBizBase()
+bizBase <- bizBase[bizBase$business_id %in% bizIds]
+bizBase <- select(bizBase, business_id, review_count, stars)
+
+bizAttr <- yelp.readBizAttr()
+bizAttr <- bizAttr[bizAttr$business_id %in% bizIds]
+
+dataset <- merge(bizBase, bizAttr, by = 'business_id')
+```
+2. 후기의 개수가 적게 누적되어 판단이 떨어지는 상점을 제거한다.
+```{r}
+dataset <- dataset[dataset$review_count > 5]
+```
+
+3. 속성이 적게 관측되어 있는 컬럼을 제거한다.
+```{r}
+cutoff <- as.integer(length(dataset$business_id) * 2 / 3)
+liveCols <- colSums(is.na(dataset)) < cutoff
+liveColNames <- colnames(dataset)[liveCols]
+dataset <- select(dataset, one_of(liveColNames))
+```
+
+4. Near Zero Value를 제거한다.
+```{r}
+dataset <- select(dataset, -nearZeroVar(dataset))
+```
+
+이제 `Coffee & Tea` 카테고리에 대해 가장 의미 있는 비지니스 속성은 다음과 같다.
+```{r}
+
+```
+
+이제 각 속성에 대해 별점이 어떻게 측정되는지 예측해보자.
+
+예측하기~~
+
+
+평가하기
+100% 정확도, 정확도는 낮지만 평균 점수의 차이가 0.5점 내외로 모여 있는 것이 보인다. 즉 해당 속성들이 `Coffee & Tea`를 구성하는데 좋은 별점을 받기위한 필수 속성으로 판별될 수 있다. 
 
 
 https://rpubs.com/davizuku/capstone

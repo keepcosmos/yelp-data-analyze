@@ -237,21 +237,334 @@ attrs[<span class="dv">1</span>:<span class="dv">10</span>]</code></pre></div>
 <div class="section level4">
 <h4>별점</h4>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">bizBase &lt;-<span class="st"> </span><span class="kw">yelp.readBizBase</span>()
-<span class="kw">select</span>(bizBase, business_id, name, stars)</code></pre></div>
-<pre><code>##                   business_id                            name stars
-##     1: vcNAWiLM4dR7D2nwwJ7nCA               Eric Goldberg, MD   3.5
-##     2: UsFtqoBl7naz8AVUBZMjQQ                    Clancy's Pub   3.5
-##     3: cE27W9VPgO88Qxe4ol6y_g        Cool Springs Golf Center   2.5
-##     4: HZdLhv6COCleJMo7nPl-RA                Verizon Wireless   3.5
-##     5: mVHrayjG3uZ_RLHkLj-AMg                   Emil's Lounge   4.5
-##    ---                                                             
-## 61180: PfnfxJw6yD1hSItqHXyblg Elites On Broadway: I Love Lucy   5.0
-## 61181: peTlb_-tmNQTZ3fz3Elieg          Charlotte Meeting Room   5.0
-## 61182: 7gmzKhAr6-A0DCGT4HN-ig                  Bouchon Bakery   4.0
-## 61183: 6TPxhpHqFedjMvBuw6pF3w          Vegas Valley Lawn Care   4.5
-## 61184: 2EKGrbf2_81MrtjKZeOTng                  coffee fellows   2.5</code></pre>
-<p><a href="https://rpubs.com/davizuku/capstone" class="uri">https://rpubs.com/davizuku/capstone</a></p>
+<span class="kw">head</span>(<span class="kw">select</span>(bizBase, business_id, name, stars), <span class="dv">5</span>)</code></pre></div>
+<pre><code>##               business_id                     name stars
+## 1: vcNAWiLM4dR7D2nwwJ7nCA        Eric Goldberg, MD   3.5
+## 2: UsFtqoBl7naz8AVUBZMjQQ             Clancy's Pub   3.5
+## 3: cE27W9VPgO88Qxe4ol6y_g Cool Springs Golf Center   2.5
+## 4: HZdLhv6COCleJMo7nPl-RA         Verizon Wireless   3.5
+## 5: mVHrayjG3uZ_RLHkLj-AMg            Emil's Lounge   4.5</code></pre>
+<ul>
+<li>각 비지니스별로 별점을 분류해서 볼 수 있다.</li>
+</ul>
 </div>
+</div>
+<div id="cleaning-and-preprocessing-data" class="section level3">
+<h3>Cleaning and Preprocessing data</h3>
+<p>각 비지니스는 여러개의 카테고리를 가질 수 있다. 각 카테고리를 통해 비지니스 속성과 별점을 불러온다. 대표적으로 Cafe &amp; Tea 카테고리로 적용해본다.</p>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">bizCat &lt;-<span class="st"> </span><span class="kw">yelp.readBizCategory</span>()
+bizIds &lt;-<span class="st"> </span>bizCat[bizCat$category ==<span class="st"> 'Coffee &amp; Tea'</span>]$business_id
+
+bizBase &lt;-<span class="st"> </span><span class="kw">yelp.readBizBase</span>()
+bizBase &lt;-<span class="st"> </span>bizBase[bizBase$business_id %in%<span class="st"> </span>bizIds]
+bizBase &lt;-<span class="st"> </span><span class="kw">select</span>(bizBase, business_id, review_count, stars)
+
+bizAttr &lt;-<span class="st"> </span><span class="kw">yelp.readBizAttr</span>()
+bizAttr &lt;-<span class="st"> </span>bizAttr[bizAttr$business_id %in%<span class="st"> </span>bizIds]
+
+dataset &lt;-<span class="st"> </span><span class="kw">merge</span>(bizBase, bizAttr, <span class="dt">by =</span> <span class="st">'business_id'</span>)
+dataset</code></pre></div>
+<pre><code>##                  business_id review_count stars By.Appointment.Only
+##    1: _-PU0gOesYm38B1FZY4SLg           20   3.5                  NA
+##    2: _6FcnmxrlrbdF3qPBVSD8w            3   4.5                  NA
+##    3: _7lfqYwzjAqWV6fUCWXP_Q            5   4.5                  NA
+##    4: _9JDgUdXbCn1Vx-nj49VJg           28   4.5                  NA
+##    5: _AwvPzaNPGQ_QZSWgsfOiw           17   3.5                  NA
+##   ---                                                              
+## 1859: ZzAME7MR7KsFtEoepNGpLg           14   3.5                  NA
+## 1860: ZZcKMWza1-GqrmhzFHW_mw          111   3.0                  NA
+## 1861: zzgXEteMduykqN8JAUG4CA            9   3.0                  NA
+## 1862: zzhzW3DImwhSwpcK1Yuy7Q           20   4.0                  NA
+## 1863: ZzP5X5NtANJoSDMneQWl5A           19   4.5                  NA
+##       Happy.Hour Accepts.Credit.Cards Good.For.Groups Outdoor.Seating
+##    1:         NA                 TRUE              NA           FALSE
+##    2:         NA                 TRUE              NA            TRUE
+##    3:         NA                   NA              NA            TRUE
+##    4:         NA                 TRUE              NA            TRUE
+##    5:         NA                 TRUE              NA            TRUE
+##   ---                                                                
+## 1859:         NA                 TRUE              NA            TRUE
+## 1860:         NA                 TRUE            TRUE            TRUE
+## 1861:         NA                 TRUE            TRUE            TRUE
+## 1862:         NA                 TRUE            TRUE           FALSE
+## 1863:         NA                 TRUE              NA            TRUE
+##       Price.Range Good.for.Kids       Alcohol Noise.Level Has.TV Attire
+##    1:           2            NA            NA          NA     NA     NA
+##    2:           1            NA            NA          NA     NA     NA
+##    3:          NA            NA            NA          NA     NA     NA
+##    4:           2            NA            NA          NA     NA     NA
+##    5:           1            NA            NA          NA     NA     NA
+##   ---                                                                  
+## 1859:           1            NA            NA          NA     NA     NA
+## 1860:           2          TRUE beer_and_wine     average  FALSE casual
+## 1861:           1          TRUE            NA          NA   TRUE casual
+## 1862:           1          TRUE          none       quiet     NA casual
+## 1863:           1            NA            NA          NA     NA     NA
+##       Ambience.romantic Ambience.intimate Ambience.classy Ambience.hipster
+##    1:                NA                NA              NA               NA
+##    2:                NA                NA              NA               NA
+##    3:                NA                NA              NA               NA
+##    4:                NA                NA              NA               NA
+##    5:                NA                NA              NA               NA
+##   ---                                                                     
+## 1859:                NA                NA              NA               NA
+## 1860:             FALSE             FALSE           FALSE            FALSE
+## 1861:             FALSE             FALSE           FALSE            FALSE
+## 1862:             FALSE             FALSE           FALSE            FALSE
+## 1863:                NA                NA              NA               NA
+##       Ambience.divey Ambience.touristy Ambience.trendy Ambience.upscale
+##    1:             NA                NA              NA               NA
+##    2:             NA                NA              NA               NA
+##    3:             NA                NA              NA               NA
+##    4:             NA                NA              NA               NA
+##    5:             NA                NA              NA               NA
+##   ---                                                                  
+## 1859:             NA                NA              NA               NA
+## 1860:          FALSE             FALSE           FALSE            FALSE
+## 1861:          FALSE             FALSE           FALSE            FALSE
+## 1862:             NA             FALSE           FALSE            FALSE
+## 1863:             NA                NA              NA               NA
+##       Ambience.casual Good.For.Dancing Delivery Coat.Check Smoking
+##    1:              NA               NA       NA         NA      NA
+##    2:              NA               NA       NA         NA      NA
+##    3:              NA               NA       NA         NA      NA
+##    4:              NA               NA       NA         NA      NA
+##    5:              NA               NA       NA         NA      NA
+##   ---                                                             
+## 1859:              NA               NA       NA         NA      NA
+## 1860:            TRUE               NA    FALSE         NA      NA
+## 1861:           FALSE               NA    FALSE         NA      NA
+## 1862:           FALSE               NA    FALSE         NA      NA
+## 1863:              NA               NA     TRUE         NA      NA
+##       Take.out Takes.Reservations Waiter.Service Wi.Fi Caters
+##    1:       NA                 NA             NA  free     NA
+##    2:       NA                 NA             NA  free     NA
+##    3:       NA                 NA             NA  free     NA
+##    4:       NA                 NA             NA  free     NA
+##    5:       NA                 NA             NA  free     NA
+##   ---                                                        
+## 1859:       NA                 NA             NA  free     NA
+## 1860:     TRUE              FALSE           TRUE    no  FALSE
+## 1861:     TRUE              FALSE             NA    NA     NA
+## 1862:     TRUE              FALSE          FALSE  free     NA
+## 1863:       NA                 NA             NA  free     NA
+##       Good.For.dessert Good.For.latenight Good.For.lunch Good.For.dinner
+##    1:               NA                 NA             NA              NA
+##    2:               NA                 NA             NA              NA
+##    3:               NA                 NA             NA              NA
+##    4:               NA                 NA             NA              NA
+##    5:               NA                 NA             NA              NA
+##   ---                                                                   
+## 1859:               NA                 NA             NA              NA
+## 1860:            FALSE              FALSE           TRUE           FALSE
+## 1861:            FALSE              FALSE          FALSE           FALSE
+## 1862:            FALSE              FALSE          FALSE           FALSE
+## 1863:               NA                 NA             NA              NA
+##       Good.For.breakfast Good.For.brunch Parking.garage Parking.street
+##    1:                 NA              NA          FALSE          FALSE
+##    2:                 NA              NA          FALSE          FALSE
+##    3:                 NA              NA          FALSE          FALSE
+##    4:                 NA              NA          FALSE          FALSE
+##    5:                 NA              NA          FALSE          FALSE
+##   ---                                                                 
+## 1859:                 NA              NA          FALSE          FALSE
+## 1860:              FALSE           FALSE           TRUE          FALSE
+## 1861:              FALSE           FALSE             NA             NA
+## 1862:              FALSE           FALSE          FALSE          FALSE
+## 1863:                 NA              NA           TRUE          FALSE
+##       Parking.validated Parking.lot Parking.valet Music.dj Drive.Thru
+##    1:             FALSE        TRUE         FALSE       NA         NA
+##    2:             FALSE       FALSE         FALSE       NA         NA
+##    3:             FALSE       FALSE         FALSE       NA         NA
+##    4:             FALSE        TRUE         FALSE       NA         NA
+##    5:             FALSE        TRUE         FALSE       NA         NA
+##   ---                                                                
+## 1859:             FALSE        TRUE         FALSE       NA         NA
+## 1860:             FALSE       FALSE         FALSE       NA         NA
+## 1861:                NA          NA            NA       NA         NA
+## 1862:                NA       FALSE         FALSE       NA         NA
+## 1863:             FALSE       FALSE         FALSE       NA         NA
+##       Wheelchair.Accessible Music.background_music Music.karaoke
+##    1:                    NA                     NA            NA
+##    2:                    NA                     NA            NA
+##    3:                    NA                     NA            NA
+##    4:                  TRUE                     NA            NA
+##    5:                    NA                     NA            NA
+##   ---                                                           
+## 1859:                    NA                     NA            NA
+## 1860:                  TRUE                     NA            NA
+## 1861:                    NA                     NA            NA
+## 1862:                  TRUE                     NA            NA
+## 1863:                    NA                     NA            NA
+##       Music.live Music.video Music.jukebox BYOB Corkage BYOB.Corkage
+##    1:         NA          NA            NA   NA      NA           NA
+##    2:         NA          NA            NA   NA      NA           NA
+##    3:         NA          NA            NA   NA      NA           NA
+##    4:         NA          NA            NA   NA      NA           NA
+##    5:         NA          NA            NA   NA      NA           NA
+##   ---                                                               
+## 1859:         NA          NA            NA   NA      NA           NA
+## 1860:         NA          NA            NA   NA      NA           NA
+## 1861:         NA          NA            NA   NA      NA           NA
+## 1862:         NA          NA            NA   NA      NA           NA
+## 1863:         NA          NA            NA   NA      NA           NA
+##       Order.at.Counter Good.For.Kids Dogs.Allowed Open.24.Hours
+##    1:               NA            NA           NA            NA
+##    2:               NA            NA           NA            NA
+##    3:               NA            NA           NA            NA
+##    4:               NA            NA           NA            NA
+##    5:               NA            NA           NA            NA
+##   ---                                                          
+## 1859:               NA            NA           NA            NA
+## 1860:             TRUE          TRUE           NA            NA
+## 1861:               NA            NA           NA            NA
+## 1862:               NA            NA           NA            NA
+## 1863:               NA            NA           NA            NA
+##       Hair.Types.Specialized.In.coloring
+##    1:                                 NA
+##    2:                                 NA
+##    3:                                 NA
+##    4:                                 NA
+##    5:                                 NA
+##   ---                                   
+## 1859:                                 NA
+## 1860:                                 NA
+## 1861:                                 NA
+## 1862:                                 NA
+## 1863:                                 NA
+##       Hair.Types.Specialized.In.africanamerican
+##    1:                                        NA
+##    2:                                        NA
+##    3:                                        NA
+##    4:                                        NA
+##    5:                                        NA
+##   ---                                          
+## 1859:                                        NA
+## 1860:                                        NA
+## 1861:                                        NA
+## 1862:                                        NA
+## 1863:                                        NA
+##       Hair.Types.Specialized.In.curly Hair.Types.Specialized.In.perms
+##    1:                              NA                              NA
+##    2:                              NA                              NA
+##    3:                              NA                              NA
+##    4:                              NA                              NA
+##    5:                              NA                              NA
+##   ---                                                                
+## 1859:                              NA                              NA
+## 1860:                              NA                              NA
+## 1861:                              NA                              NA
+## 1862:                              NA                              NA
+## 1863:                              NA                              NA
+##       Hair.Types.Specialized.In.kids Hair.Types.Specialized.In.extensions
+##    1:                             NA                                   NA
+##    2:                             NA                                   NA
+##    3:                             NA                                   NA
+##    4:                             NA                                   NA
+##    5:                             NA                                   NA
+##   ---                                                                    
+## 1859:                             NA                                   NA
+## 1860:                             NA                                   NA
+## 1861:                             NA                                   NA
+## 1862:                             NA                                   NA
+## 1863:                             NA                                   NA
+##       Hair.Types.Specialized.In.asian
+##    1:                              NA
+##    2:                              NA
+##    3:                              NA
+##    4:                              NA
+##    5:                              NA
+##   ---                                
+## 1859:                              NA
+## 1860:                              NA
+## 1861:                              NA
+## 1862:                              NA
+## 1863:                              NA
+##       Hair.Types.Specialized.In.straightperms Accepts.Insurance
+##    1:                                      NA                NA
+##    2:                                      NA                NA
+##    3:                                      NA                NA
+##    4:                                      NA                NA
+##    5:                                      NA                NA
+##   ---                                                          
+## 1859:                                      NA                NA
+## 1860:                                      NA                NA
+## 1861:                                      NA                NA
+## 1862:                                      NA                NA
+## 1863:                                      NA                NA
+##       Ages.Allowed Payment.Types.amex Payment.Types.cash_only
+##    1:           NA                 NA                      NA
+##    2:           NA                 NA                      NA
+##    3:           NA                 NA                      NA
+##    4:           NA                 NA                      NA
+##    5:           NA                 NA                      NA
+##   ---                                                        
+## 1859:           NA                 NA                      NA
+## 1860:           NA                 NA                      NA
+## 1861:           NA                 NA                      NA
+## 1862:           NA                 NA                      NA
+## 1863:           NA                 NA                      NA
+##       Payment.Types.mastercard Payment.Types.visa Payment.Types.discover
+##    1:                       NA                 NA                     NA
+##    2:                       NA                 NA                     NA
+##    3:                       NA                 NA                     NA
+##    4:                       NA                 NA                     NA
+##    5:                       NA                 NA                     NA
+##   ---                                                                   
+## 1859:                       NA                 NA                     NA
+## 1860:                       NA                 NA                     NA
+## 1861:                       NA                 NA                     NA
+## 1862:                       NA                 NA                     NA
+## 1863:                       NA                 NA                     NA
+##       Dietary.Restrictions.dairy.free Dietary.Restrictions.gluten.free
+##    1:                              NA                               NA
+##    2:                              NA                               NA
+##    3:                              NA                               NA
+##    4:                              NA                               NA
+##    5:                              NA                               NA
+##   ---                                                                 
+## 1859:                              NA                               NA
+## 1860:                              NA                               NA
+## 1861:                              NA                               NA
+## 1862:                              NA                               NA
+## 1863:                              NA                               NA
+##       Dietary.Restrictions.vegan Dietary.Restrictions.kosher
+##    1:                         NA                          NA
+##    2:                         NA                          NA
+##    3:                         NA                          NA
+##    4:                         NA                          NA
+##    5:                         NA                          NA
+##   ---                                                       
+## 1859:                         NA                          NA
+## 1860:                         NA                          NA
+## 1861:                         NA                          NA
+## 1862:                         NA                          NA
+## 1863:                         NA                          NA
+##       Dietary.Restrictions.halal Dietary.Restrictions.soy.free
+##    1:                         NA                            NA
+##    2:                         NA                            NA
+##    3:                         NA                            NA
+##    4:                         NA                            NA
+##    5:                         NA                            NA
+##   ---                                                         
+## 1859:                         NA                            NA
+## 1860:                         NA                            NA
+## 1861:                         NA                            NA
+## 1862:                         NA                            NA
+## 1863:                         NA                            NA
+##       Dietary.Restrictions.vegetarian Music.playlist
+##    1:                              NA             NA
+##    2:                              NA             NA
+##    3:                              NA             NA
+##    4:                              NA             NA
+##    5:                              NA             NA
+##   ---                                               
+## 1859:                              NA             NA
+## 1860:                              NA             NA
+## 1861:                              NA             NA
+## 1862:                              NA             NA
+## 1863:                              NA             NA</code></pre>
+<p><a href="https://rpubs.com/davizuku/capstone" class="uri">https://rpubs.com/davizuku/capstone</a></p>
 </div>
 </div>
 
