@@ -1,0 +1,82 @@
+```{r, echo=F}
+source('data_loader.R')
+bizCat <- yelp.readBizCategory()
+bizAttr <- yelp.readBizAttr()
+bizBase <- yelp.readBizBase()
+attrs <- colnames(select(bizAttr, -business_id))
+bizIds <- bizCat[bizCat$category == 'Coffee & Tea']$business_id
+bizBase <- bizBase[bizBase$business_id %in% bizIds]
+bizBase <- select(bizBase, business_id, review_count, stars)
+bizAttr <- bizAttr[bizAttr$business_id %in% bizIds]
+dataset <- merge(bizBase, bizAttr, by = 'business_id')
+dataset <- dataset[dataset$review_count > 5]
+dataset <- select(dataset, -review_count)
+cutoff <- as.integer(length(dataset$business_id) * 2 / 3)
+liveCols <- colSums(is.na(dataset)) < cutoff
+liveColNames <- colnames(dataset)[liveCols]
+dataset <- select(dataset, one_of(liveColNames))
+dataset <- select(dataset, -nearZeroVar(dataset))
+dataset <- dataset[, lapply(.SD, as.character)]
+dataset[is.na(dataset)] <- 'NOT OBSERVED'
+dataset <- dataset[, lapply(.SD, as.factor)]
+dataset$business_id <- as.character(dataset$business_id)
+set.seed(123)
+trainIndex <- createDataPartition(dataset$stars, p = 0.8, list = F)[, 1]
+trainData <- dataset[trainIndex]
+trainData <- select(trainData, -business_id)
+testData <- dataset[-trainIndex]
+library('rpart')
+model <- rpart(stars ~ ., data = trainData, method = 'class', control = rpart.control(minsplit=30, cp=0.001))
+pred <- predict(model, testData, type = 'class')
+result <- data.table(origin = as.numeric(as.character(testData$stars)), pred = as.numeric(as.character(pred)))
+result <- mutate(result, gap = pred - origin)
+```
+
+Data Science Captone:  Yelp Data Analysis
+========================================================
+author: Jaehyun Shin
+date: 21 Nov 2015
+
+
+The purpose of this Study
+========================================================
+- <span style="font-size:40px;font-weight:bold">Find the correlation between a variety of attribution and rating including additional service which business provides.</span>
+<br/><br/>
+- <span style="font-size:40px;font-weight:bold">Build rating prediction model based on attribute data.</span>
+
+
+Business Attributes And Category
+========================================================
+
+- Category (`r length(unique(bizCat$category))` categories exist.)
+```{r, echo=F}
+as.character(unique(bizCat$category)[1:8])
+```
+- Attributes (`r length(attrs)` attributes exist.)
+```{r, echo=F}
+attrs[1:8]
+```
+
+
+Methodology
+========================================================
+Model an prediction algorithm through the relevant data.
+Since the relevant data is to measure the correlation between attributes and stars, "classification modeling" will be used, and "rpart", a type of the algorithm, will be adopted.
+```{r, echo=FALSE}
+postResample(result$pred, result$origin)
+```
+The error level is comparatively high when using `postResample` to measure. But while considering the fact that the relevant value is rating, the difference between the estimation and the actual measured value is examined.
+
+Final Analysis
+========================================================
+
+```{r, echo=F, fig.width=10, fig.height=3}
+sp <- ggplot(result, aes(x = 1:length(result$gap), y = gap))
+sp <- sp + geom_point(position = position_jitter(width=.3, height = .06), 
+                alpha = 0.8, shape=21, size=1.5)
+sp + stat_smooth(method=lm)
+```
+
+Cases in which the error range of the ratings is below 0.5 is `r sum(result$gap < 1 & result$gap > -1) / length(result$gap) * 100`% of all data.
+
+As shown on the graph, the difference between the estimation and actual measured value is mostly concentrated between -0.5 ~ 0.5, and since the median value and average value are very close to 0, the data is reliable.

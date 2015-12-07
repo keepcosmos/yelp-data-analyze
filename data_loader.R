@@ -2,7 +2,6 @@
 library('data.table')
 library('dplyr')
 library('caret')
-library('randomForest')
 
 yelp.attrAndStarByCategory <- function(category){
   catAttr <- yelp.bizAttrByCategory(category)

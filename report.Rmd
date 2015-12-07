@@ -1,122 +1,36 @@
 ---
 title: "Data Science Capstone - Final Report"
 author: "Jaehyun Shin"
-date: "09 Nov 2015"
+date: "21 Nov 2015"
 output:
-  html_document: 
-    highlight: tango
   pdf_document:
-    latex_engine: xelatex
+    highlight: tango
+classoption: a4paper
 ---
 
-### 비지니스 카테고리별 속성에 따른 사용자 별점 예측
+### Find correlation between each business's attributes and rating(star) per business category and Build rating prediction model
 
 ## Abstract
-이 리포트는 비지니스가 제공하는 부가서비스 및 속성에 따른 평점의 연관관계를 찾아내고 예측 모델을 만드는 연구이다. 비지니스의 카테고리별로 영향을 미치는 속성이 다르기 때문에, 카테고리별로 분류하여 측정할 것이다.
+The purpose of this study shows the correlation between a variety of attribution and rating including additional service which business provides, Furthermore, this study shows rating prediction model based on attribute data. Because the attribution affecting is different according to business category characteristics, this study will progress per category.
 
 ## Introduction
-각 비지니스의 카테고리 별로 Wi-Fi, Parking area, Happy hour등의 다양한 부가적 서비스를 제공하고. 또한 Appolintment.Only, Smoking, Dos Allowed와 같은 여러 속성들이 있다.
+The data used in this study is based on **Yelp Challenge Dataset**. Each business has several categories  such as cafe, bar, spa, restaurant, etc. And each business provides a variety of additional services such as 'Wi-Fi', 'Parking area', 'Happy hour’, etc. and also has various attributions including options like ‘Appolintment.Only', ‘Smoking', 'Dos Allowed’.
 
-각 비지니스의 종류별로(카페, 바, 뷰티 & 스파) 사용자들에게 필요한 부가서비스나 고려사항들이 다를 것이며, 그 제공되는 속성들에 따라서 사용자가 느끼는 서비스 퀄리티도 다를것이다.
+Each business category provides users with needed additional service and options, which are all different and depending on the attributes of the business, the service quality will be different by each and every one of users.
 
-이 리포트는 각 비지니스 종류별로 사용자들에게 보편적으로 고려되는 속성을 찾아내고, 어떤 종류의 속성이 평점에 영향을 미치는지를 찾아내는 과정을 기술한다. 또한 비지니스 종류별 / 속성에 따라 평점을 예측할 수 있는 모델을 제안한다.
+This study finds out about the main attributies that users are considering of each business category, and finds what correlation that attributes and rating. Also it presents a model, which can predict the rating, by different attributes of each business category.
 
-* 아래 기술된 R 소스는 https://github.com/keepcosmos/yelp-data-analyze 에서 확인할 수 있다.
+From this, people who do business can provide customers with better experince because, they can add additional service and options to the one's business caterory.
+
 
 ## Getting and formatting the data
+Data can be found at  [Yelp Datset challenge](http://www.yelp.com/dataset_challenge). The data is json format and organized with business information, review information, user information, check-in information and tip information.
 
-### Getting the data
-데이터는 [Yelp Datset challenge](http://www.yelp.com/dataset_challenge)를 통해 얻을 수 있다. 해당 데이터는 json format이며 비지니스 정보, 리뷰 정보, 사용자정보, 체크인정보, 팁 정보로 구성되어 있다.
-
-아래에는 yelp에서 다운로드 받은 text파일을 파싱하여 data.frame으로 변환하는 작업을 설명한다.
-
-### Getting and Cleaning Data
-1. json 포멧으로 되어있는 text파일을 불러오고, 특정 조건에 따라 파싱할 수 있는 메서드 정의
-
-```{r}
-library(RJSONIO)
-
-# '/data' 폴더 및에 있는 데이터.json파일을 읽어온다.
-yelp.loadFile <- function(sourceType){
-  filePath <- paste("data/yelp_academic_dataset_", sourceType, ".json", sep='')
-  readLines(filePath, -1L)
-}
-
-# 각 string 라인을 JSON타입으로 변경하고, 변경된 내용을 callback으로 넘겨준다.
-# 즉, JSON으로 파싱된 각 라인별로 특정 조건에 따라 파싱할 수 있도록 해준다.
-yelp.eachData <- function(sourceType, func){
-  lines <- yelp.loadFile(sourceType)
-  lineLength <- length(lines)
-  for(i in 1:lineLength){ func(fromJSON(lines[i]), i) }
-}
-
-yelp.eachBusinessData <- function(func){
-  yelp.eachData('business', func)
-}
-# source에 따라 yelp.eachTipData, yelp.eachReviewData등을 정의한다.
-```
-
-2. 위에 정의되어 있는 메서드를 사용하여, 아래와 같은방법으로 파싱하여 원하는 데이터를 data.frame으로 반환할 수 있도록 해주었다.
-
-  + 비지니스의 기본적인 속성을 data.frame 타입으로 변환한다.
-```{r}
-library('data.table')
-yelp.loadBusinessBase <- function(){
-  columns <- c('business_id', 'full_address', 'city', 'review_count', 'name', 'longitude', 'state', 'stars', 'latitude', 'type')
-  factorColumns <- c('city', 'state', 'type')
-  baseData <- vector(mode = 'list')
-  yelp.eachBusinessData(function(data, i){
-    baseData[[i]] <<- data[columns]
-  })
-  baseData <- ldply(baseData, data.frame, stringsAsFactors = F)
-  
-  for(column in factorColumns){
-    baseData[[column]] <- as.factor(baseData[[column]])
-  }
-  data.table(baseData)
-}
-```
-
-  +  각 비지니스의 카테고리 정보를 data.frame 타입으로 변환한다.
-```{r, warning=F, message=F, cache=T}
-yelp.loadBusinessCategory <- function(){
-  businessCategory <- data.table(business_id = character(),
-                                 category = character())
-  yelp.eachBusinessData(function(data, i){
-    for(category in data$categories){
-      businessCategory <<- rbind(businessCategory,
-                                data.table(business_id = data$business_id, category = category))
-    }
-  })
-  businessCategory$category <- as.factor(businessCategory$category)
-  businessCategory
-}
-```
-
-  + 각 비지니스의 속성 정보를 data.frame 타입으로 변환한다.
-```{r}
-yelp.loadBusinessAttribute <- function(){
-  columns <- yelp.getAttributeColumKeys()
-  businessAttribute <- data.table()
-  for(column in columns) businessAttribute[[column]] <- character()
-  yelp.eachBusinessData(function(data, i){
-    if(length(data$attributes) > 0){
-      tryCatch({
-        businessAttribute <<- rbind(businessAttribute, data.table(business_id = as.character(data$business_id), t(unlist(data$attributes))), fill = TRUE) 
-      }, error = function(e){
-        warning(i, " line parsing error : ", e)
-      })
-    }
-  })
-  yelp.castAttributeData(businessAttribute)
-}
-```
-
-* 더 자세한 해당 소스는 https://github.com/keepcosmos/yelp-data-analyze에서 확인 할 수 있다.
+**The processing sources of parsing text(json) file downloaded from Yelp to "data.frame" can be found on [https://github.com/keepcosmos/yelp-data-analyze](https://github.com/keepcosmos/yelp-data-analyze)**
 
 ### Exploratory the data
 
-위의 방식으로 파싱된 데이터들은 `Rda`파일로 변환 / 저장시킨 후 사용할 수 있도록 하였다.
+Parsed data via the above process can be used after converting/saving in `Rda` file.
 ```{r, warning=F, message=F}
 source('data_loader.R')
 bizBase <- yelp.readBizBase()
@@ -124,58 +38,57 @@ bizCat <- yelp.readBizCategory()
 bizAttr <- yelp.readBizAttr()
 ```
 
-#### 비지니스 카테고리
-1. 카테고리는 business_id, category 2개의 컬럼이 존재하고, 하나의 비지니스는 여러개의 카테고리를 가질 수 있다.
+#### Business Category
+1. 2 columns `business_id`, `category` exist in the category data.frame, and one business can have several categories.
 ```{r}
 head(bizCat, 5)
 ```
 
-2. 각 카테고리 별로 비지니스의 수를 알 수 있다.
+2. One can check the number of businesses per each category.
 ```{r}
 summary(bizCat$category)[1:10]
 ```
-* 총 `r length(unique(bizCat$category))` 개의 카테고리가 존재한다.
+* **`r length(unique(bizCat$category))`** categories exist.
 
-#### 비지니스 속성
+#### Business Attributes
 ```{r}
 attrs <- colnames(select(bizAttr, -business_id))
 attrs[1:10]
 ```
-* 총 `r length(attrs)`개의 속성이 존재한다.
+* **`r length(attrs)`** attributes exist.
 
-#### 별점
+#### Stars(rating)
 ```{r}
 head(select(bizBase, business_id, name, stars), 5)
 ```
-* 각 비지니스별로 별점을 분류해서 볼 수 있다.
+* stars can be sorted by each business.
 
+Each business has several categories. The main attributes observed differ in every business category. For example, in the category of *Bars, Wi-Fi, Noize Level, Happy Hour* are easily observed in many businesses, but attributes such as *hair type* is not observed.
 
-각 비지니스는 여러개의 카테고리를 가지고있다. 각 비지니스 카테고리별로 관측된 속성들이 다르다, 예를 들어 `Bars` 카테고리의 경우, Wi-Fi, Noize Level, Happy Hour들은 관측된 비지니스가 많지만, hair type과 같은 속성은 관측되지 않는다. 
-우리는 각 카테고리별로 유효한 속성드를 분류해 낼 수 있을 것이며, 그 속성에 따라 평점의 연관관계를 측정해 볼 수 있을 것이다. 물론 리뷰의 갯수도 고려해야할 대상이다.
+We can filter effective attributes by category. According to this attributes, we can derive the correlation with stars. The number of reviews is also considered importantly.
 
+## Method
 ### Preprocessing data
-각 카테고리별로 추출해야할 Attribute가 다르기 때문에 이 레포트에서는 대표적으로 `Coffee & Tea` 카테고리를 예로 한다. 
+Because the property which is extracted per each category is different, this study especially uses the example of `Coffee & Tea` category.
 
-1. 카테고리에 따라 평점 데이터와 속성 데이터 추출하기
+1. Extracting stars and attributes data by categories
 ```{r}
 bizIds <- bizCat[bizCat$category == 'Coffee & Tea']$business_id
 
-bizBase <- yelp.readBizBase()
 bizBase <- bizBase[bizBase$business_id %in% bizIds]
 bizBase <- select(bizBase, business_id, review_count, stars)
-
-bizAttr <- yelp.readBizAttr()
 bizAttr <- bizAttr[bizAttr$business_id %in% bizIds]
+
 dataset <- merge(bizBase, bizAttr, by = 'business_id')
 ```
 
-2. 후기의 개수가 적게 누적되어 판단이 떨어지는 상점을 제거한다.
+2. Remove businesses that have few reviews, which are difficult to judge fairly.
 ```{r}
 dataset <- dataset[dataset$review_count > 5]
 dataset <- select(dataset, -review_count)
 ```
 
-3. 속성이 적게 관측되어 있는 컬럼을 제거한다.
+3. Remove columns of which few attributes are observed.
 ```{r}
 cutoff <- as.integer(length(dataset$business_id) * 2 / 3)
 liveCols <- colSums(is.na(dataset)) < cutoff
@@ -183,33 +96,32 @@ liveColNames <- colnames(dataset)[liveCols]
 dataset <- select(dataset, one_of(liveColNames))
 ```
 
-4. Near Zero Value를 제거한다.
+4. Remove 'Near Zero Value'.
 ```{r}
 dataset <- select(dataset, -nearZeroVar(dataset))
 ```
 
-이제 `Coffee & Tea` 카테고리에 대해 가장 의미 있는 비지니스 속성은 다음과 같다.
-```{r}
-str(dataset)
-```
-
-### Modeling
-
-해당 데이터 내용을 통해 Machine learning을 할 수 있는, 예측 알고리즘 모델링을 만든다.
-해당 데이터는 속성에 따른 연관관계를 측정하는 것이므로 classification modeling을 할 것이고, 그 알고리즘 중 하나인 rpart를 사용할 것이다.
-
-모든 데이터들을 factor로 변환할 것이다.
-
-1. 해당 데이터에서 NA 값이 들어있는 처리해준다.
+5. Treating 'NA' values
 ```{r}
 dataset <- dataset[, lapply(.SD, as.character)]
 dataset[is.na(dataset)] <- 'NOT OBSERVED'
 dataset <- dataset[, lapply(.SD, as.factor)]
 dataset$business_id <- as.character(dataset$business_id)
 ```
-  + NA 값은 'NOT OBSERVED'란 별도의 값으로 처리한다.
+  + Process the 'NA' with a "NOT OBSERVED" value.
 
-2. Data Splitting
+The most meaningful business attributes of the `Coffee & Tea` category are as follows.
+```{r}
+str(dataset)
+```
+
+### Modeling
+Model an prediction algorithm through the relevant data.
+Since the relevant data is to measure the correlation between attributes and stars, *classification modeling* will be used, and **rpart**, a type of the algorithm, will be adopted.
+
+* All data will be converted to `factor` type.
+
+1. Data Splitting
 ```{r}
 set.seed(123)
 trainIndex <- createDataPartition(dataset$stars, p = 0.8, list = F)[, 1]
@@ -218,14 +130,45 @@ trainData <- select(trainData, -business_id)
 testData <- dataset[-trainIndex]
 ```
 
+3. training & predict
+Using rpart:
+rpart is Recursive partitioning for classification, regression and survival trees. 
+```{r}
+library('rpart')
+model <- rpart(stars ~ ., data = trainData, method = 'class', 
+               control = rpart.control(minsplit=30, cp=0.001))
+pred <- predict(model, testData, type = 'class')
+result <- data.table(origin = as.numeric(as.character(testData$stars)), 
+                     pred = as.numeric(as.character(pred)))
+result <- mutate(result, gap = pred - origin)
+```
 
-이제 각 속성에 대해 별점이 어떻게 측정되는지 예측해보자.
+## Result
+```{r}
+summary(result$gap)
+```
 
-예측하기~~
+```{r}
+postResample(result$pred, result$origin)
+```
 
+```{r}
+sp <- ggplot(result, aes(x = 1:length(result$gap), y = gap))
+sp <- sp + geom_point(position = position_jitter(width=.3, height = .06), 
+                alpha = 0.8, shape=21, size=1.5)
+sp + stat_smooth(method=lm)
+```
 
-평가하기
-100% 정확도, 정확도는 낮지만 평균 점수의 차이가 0.5점 내외로 모여 있는 것이 보인다. 즉 해당 속성들이 `Coffee & Tea`를 구성하는데 좋은 별점을 받기위한 필수 속성으로 판별될 수 있다. 
+Cases in which the error range of the ratings is below 0.5 is *`r sum(result$gap < 1 & result$gap > -1) / length(result$gap) * 100`%* of all data.
 
+## discussion
+The error level is comparatively high when using `postResample` to measure. But while considering the fact that the relevant value is rating, the difference between the estimation and the actual measured value is examined.
 
-https://rpubs.com/davizuku/capstone
+As shown on the graph, the difference between the estimation and actual measured value is mostly concentrated between -0.5 ~ 0.5, and since the median value and average value are very close to 0, the data is reliable.
+
+Therefore, the relevant attributes can be distinguished as necessary attributes for receiving good ratings in the "Coffee & Tea" category.
+
+## More
+- The level of influence of each factor upon a rating can be measured in order to assist each business.
+
+- The level of influence of each factor upon a rating may differ according to each business category. A model that also considers this can be designed.
